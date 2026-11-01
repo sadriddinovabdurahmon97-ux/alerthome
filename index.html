@@ -164,6 +164,7 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-size: 
     <div class="tools">
       <span class="pill" id="pConn"><i class="dot"></i><span id="tConn">Ulanmagan</span></span>
       <span class="pill" id="pDev"><i class="dot"></i><span id="tDev">ESP32 noma'lum</span></span>
+      <button class="ghost" id="bNotif">Bildirish</button>
       <button class="ghost" id="bSet">Sozlamalar</button>
       <button class="ghost" id="bTheme" aria-label="Rangni almashtirish">Rang</button>
     </div>
@@ -376,7 +377,40 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-size: 
     if (events.length > 100) events.shift();
     store.set('ah_events', JSON.stringify(events));
     renderLog();
+    if (Math.abs(Date.now() / 1000 - e.ts) < 180) notify(e.txt);
   }
+  /* ---- bildirishnoma (SMS kabi) ---- */
+  var swReg = null;
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(function (r) { swReg = r; }).catch(function () {});
+  function notifyState() {
+    var b = $('bNotif'); if (!b) return;
+    if (!('Notification' in window)) { b.textContent = 'Bildirish yo\'q'; return; }
+    b.textContent = Notification.permission === 'granted' ? 'Bildirish: yoqiq' : 'Bildirishni yoq';
+  }
+  function beep() {
+    try {
+      var a = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.35, 0.7].forEach(function (d) {
+        var o = a.createOscillator(), g = a.createGain(); o.type = 'square'; o.frequency.value = 880;
+        g.gain.value = 0.15; o.connect(g); g.connect(a.destination); o.start(a.currentTime + d); o.stop(a.currentTime + d + 0.25);
+      });
+    } catch (x) {}
+  }
+  function notify(txt) {
+    try { if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 800]); } catch (x) {}
+    beep();
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    var opt = { body: txt, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'alerthome', renotify: true, requireInteraction: true, vibrate: [400, 150, 400, 150, 800] };
+    try {
+      if (swReg && swReg.showNotification) swReg.showNotification('AlertHome — Yer Qimirlash', opt);
+      else new Notification('AlertHome — Yer Qimirlash', opt);
+    } catch (x) {}
+  }
+  $('bNotif').onclick = function () {
+    if (!('Notification' in window)) { alert('Bu brauzer bildirishnomani qo\'llamaydi. Saytni bosh ekranga qo\'shib, o\'sha ilovadan oching.'); return; }
+    Notification.requestPermission().then(function () { notifyState(); if (Notification.permission === 'granted') notify('Bildirishnoma yoqildi. Zilzila bo\'lsa shu yerga xabar keladi.'); });
+  };
+  notifyState();
   $('bClear').onclick = function () { events = []; store.set('ah_events', '[]'); renderLog(); };
 
   /* ---- seismograph ---- */
