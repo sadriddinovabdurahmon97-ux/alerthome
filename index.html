@@ -94,6 +94,8 @@ canvas { width: 100%; height: 190px; display: block; background: var(--panel-2);
 .scale i.on.m { background: var(--warn); }
 .scale i.on.h { background: var(--crit); }
 .ticks { grid-column: 1 / -1; display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.tip { position: absolute; top: 6px; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; box-shadow: 0 2px 10px rgb(0 0 0 / 0.18); min-width: 150px; }
+.tip b { color: var(--accent); font-weight: 500; }
 .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
@@ -157,8 +159,8 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
   <div class="cols">
     <div class="stack">
       <section class="panel">
-        <h2>Tebranish <small>so'nggi 4 daqiqa, g</small></h2>
-        <canvas id="cv" width="800" height="190"></canvas>
+        <h2>Tebranish <small>so'nggi 60 soniya, g</small></h2>
+        <div style="position:relative"><canvas id="cv" width="800" height="190" style="touch-action:pan-y"></canvas><div id="tip" class="tip" hidden></div></div>
         <p class="note" id="gNow">Hozir: –</p>
       </section>
 
@@ -240,7 +242,8 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
 
   var st = { g: 0, ball: 0, q: 0, f: 0, gas: 0, t: null, mute: 0, siren: 0, thr: 0.05, up: 0, rssi: 0 };
   var hist = [];            // g values, 1 per second
-  var HMAX = 240;
+  var HMAX = 600;   // 10 namuna/s, oxirgi 60 soniya
+  var hover = -1;
   var client = null, demoTimer = null, demo = false;
   var devOnline = false, lastStatusAt = 0;
   var events = [];
@@ -297,8 +300,9 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
     }
     $('gNow').textContent = 'Hozir: ' + st.g.toFixed(3) + ' g   Chegara: ' + Number(st.thr).toFixed(2) + ' g';
 
-    setTile('tFire', st.f ? 'OLOV BOR' : 'Normal', st.f ? 'crit' : 'ok');
-    setTile('tGas', st.gas ? 'XAVF' : 'Normal', st.gas ? 'crit' : 'ok');
+    var live = devOnline || demo;
+    setTile('tFire', !live ? '–' : st.f ? 'OLOV BOR' : 'Normal', live ? (st.f ? 'crit' : 'ok') : '');
+    setTile('tGas', !live ? '–' : st.gas ? 'XAVF' : 'Normal', live ? (st.gas ? 'crit' : 'ok') : '');
     setTile('tTemp', st.t == null ? '–' : st.t.toFixed(1) + ' °C', '');
     setTile('tWifi', (devOnline || demo) ? st.rssi + ' dBm' : '–', '');
     setTile('tUp', (devOnline || demo) ? fmtUp(st.up) : '–', '');
@@ -370,20 +374,58 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
     cx.setLineDash([]);
     if (!hist.length) return;
     var x0 = 34, step = (w - x0) / (HMAX - 1);
-    cx.strokeStyle = wave; cx.lineWidth = 1.6; cx.beginPath();
+    cx.strokeStyle = wave; cx.lineWidth = 1.5; cx.lineJoin = 'round'; cx.beginPath();
     hist.forEach(function (g, i) {
       var x = x0 + (HMAX - hist.length + i) * step;
-      var y = mid - (Math.min(g, top) / top) * (h / 2 - 8) * (i % 2 ? 1 : -1);
+      var y = mid - (Math.max(-top, Math.min(top, g)) / top) * (h / 2 - 8);
       if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
     });
     cx.stroke();
+    if (hover >= 0 && hover < hist.length) {
+      var hx = x0 + (HMAX - hist.length + hover) * step;
+      var hy = mid - (Math.max(-top, Math.min(top, hist[hover])) / top) * (h / 2 - 8);
+      cx.strokeStyle = muted; cx.lineWidth = 1; cx.setLineDash([3, 3]);
+      cx.beginPath(); cx.moveTo(hx, 0); cx.lineTo(hx, h); cx.stroke(); cx.setLineDash([]);
+      cx.fillStyle = css('--accent'); cx.beginPath(); cx.arc(hx, hy, 4, 0, 6.2832); cx.fill();
+    }
   }
+  function fmtDb(g) { var mg = Math.abs(g) * 1000; return mg < 0.5 ? '–' : (20 * Math.log10(mg)).toFixed(1) + ' dB'; }
+  function showTip(clientX) {
+    var r = cv.getBoundingClientRect(), w = r.width, x0 = 34;
+    var step = (w - x0) / (HMAX - 1);
+    var px = clientX - r.left;
+    var idx = Math.round((px - x0) / step) - (HMAX - hist.length);
+    if (!hist.length || idx < 0 || idx >= hist.length) { hideTip(); return; }
+    hover = idx;
+    var g = hist[idx], a = Math.abs(g);
+    var tip = $('tip');
+    var ago = ((hist.length - 1 - idx) / 10).toFixed(1);
+    tip.innerHTML = '<b>' + (g >= 0 ? '+' : '−') + a.toFixed(3) + ' g</b><br>' +
+      'Tezlanish: ' + (a * 981).toFixed(1) + ' sm/s²<br>' +
+      'Daraja: ' + fmtDb(a) + ' <span style="color:var(--muted)">(1 mg ga nisbatan)</span><br>' +
+      'Ball: ' + ballOf(a) + ' (taxminiy)<br>' +
+      '<span style="color:var(--muted)">' + ago + ' s oldin</span>';
+    tip.hidden = false;
+    var tw = tip.offsetWidth, left = px + 14;
+    if (left + tw > w - 4) left = px - tw - 14;
+    tip.style.left = Math.max(4, left) + 'px';
+    draw();
+  }
+  function hideTip() { hover = -1; $('tip').hidden = true; draw(); }
+  cv.addEventListener('mousemove', function (e) { showTip(e.clientX); });
+  cv.addEventListener('mouseleave', hideTip);
+  cv.addEventListener('touchstart', function (e) { showTip(e.touches[0].clientX); }, { passive: true });
+  cv.addEventListener('touchmove', function (e) { showTip(e.touches[0].clientX); }, { passive: true });
+  cv.addEventListener('touchend', function () { setTimeout(hideTip, 1800); });
   window.addEventListener('resize', draw);
 
   function onStatus(s) {
     for (var k in s) st[k] = s[k];
     if (typeof st.t === 'string') st.t = parseFloat(st.t);
-    hist.push(Math.abs(Number(s.g) || 0)); if (hist.length > HMAX) hist.shift();
+    if (Array.isArray(s.w) && s.w.length) { s.w.forEach(function (mg) { hist.push(mg / 1000); }); }
+    else { hist.push(Number(s.g) || 0); }
+    while (hist.length > HMAX) hist.shift();
+    if (hover >= 0 && hover >= hist.length) hover = -1;
     lastStatusAt = Date.now(); devOnline = true;
     render(); draw();
   }
@@ -443,7 +485,7 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
     demoTimer = setInterval(demoTick, 1000); demoTick();
   }
   function stopDemo() { demo = false; if (demoTimer) clearInterval(demoTimer); demoTimer = null; }
-  function ballOf(g) { var a = g * 981; return Math.max(0, Math.min(12, Math.floor(Math.log(a / 6) / Math.LN2) + 4)); }
+  function ballOf(g) { var a = g * 981; if (a < 3) return 0; return Math.max(1, Math.min(12, Math.floor(Math.log(a / 6) / Math.LN2) + 4)); }
   function demoTick() {
     dT++; var now = Date.now();
     var g = 0.004 + Math.random() * 0.006;
@@ -451,7 +493,8 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
     st.q = now < quakeUntil ? 1 : 0; st.f = now < fireUntil ? 1 : 0;
     st.ball = st.q ? ballOf(g) : 0; st.g = g; st.up = dT * 1 + 3600;
     st.t = 24.5 + Math.sin(dT / 30);
-    onStatus({ g: g });
+    var w = []; for (var k = 0; k < 10; k++) { var amp = now < quakeUntil ? 0.14 + Math.random() * 0.1 : 0.006; w.push(Math.round((Math.random() * 2 - 1) * amp * 1000)); }
+    onStatus({ g: g, w: w });
   }
   function demoCmd(c) {
     if (c === 'test') { quakeUntil = Date.now() + 6000; addEvent({ txt: 'Test: sinov zilzilasi (demo).', ts: Math.floor(Date.now() / 1000) }); }
