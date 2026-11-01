@@ -45,6 +45,7 @@
   --wave: #e6edf3; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
 body {
   background: var(--bg); color: var(--fg); font-family: var(--font-body);
   font-size: 15px; line-height: 1.45;
@@ -135,7 +136,7 @@ dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 dialog h3 { margin: 0 0 6px; font-family: var(--font-display); font-size: 20px; }
 dialog p { color: var(--muted); margin: 0 0 12px; }
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-input[type=text], input[type=password] { width: 100%; font: inherit; font-family: var(--font-mono); background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+input[type=text], input[type=password] { width: 100%; font: inherit; font-size: 16px; font-family: var(--font-mono); background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
 .foot { color: var(--muted); font-size: 12px; text-align: center; }
 </style>
 
@@ -341,11 +342,16 @@ input[type=text], input[type=password] { width: 100%; font: inherit; font-family
     });
   }
   function addEvent(e) {
-    var key = (e.ts || 0) + '|' + e.txt;
-    if (seenTs[key]) return; seenTs[key] = 1;
+    if (!e || !e.txt) return;
+    if (e.id) {
+      if (events.some(function (x) { return x.id === e.id; })) return;
+    } else {
+      var key = (e.ts || 0) + '|' + e.txt;
+      if (seenTs[key]) return; seenTs[key] = 1;
+      if (e.ts && events.some(function (x) { return x.ts === e.ts && x.txt === e.txt; })) return;
+    }
     if (!e.ts) e.ts = Math.floor(Date.now() / 1000);
-    if (events.some(function (x) { return x.ts === e.ts && x.txt === e.txt; })) return;
-    events.push({ txt: e.txt, ts: e.ts });
+    events.push({ id: e.id || 0, txt: e.txt, ts: e.ts });
     if (events.length > 100) events.shift();
     store.set('ah_events', JSON.stringify(events));
     renderLog();
