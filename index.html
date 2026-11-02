@@ -1044,8 +1044,8 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
   function setTiles() {
     if (!map) return;
     if (tiles) map.removeLayer(tiles);
-    tiles = L_.tileLayer('https://{s}.basemaps.cartocdn.com/' + (isDark() ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 10
+    tiles = L_.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/' + (isDark() ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base') + '/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri', maxZoom: 16
     }).addTo(map);
   }
   var L_ = window.L;
