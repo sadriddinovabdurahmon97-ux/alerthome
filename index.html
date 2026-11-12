@@ -571,6 +571,7 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
   var client = null, demoTimer = null, demo = false;
   var devOnline = false, lastStatusAt = 0, wasAlarm = false;
   var webSound = store.get('ah_websound') !== '0';
+  var thrEdit = false;            // foydalanuvchi sezgirlikni surgan, lekin hali saqlamagan
   var events = [], passes = [];
   try { events = JSON.parse(store.get('ah_events') || '[]'); } catch (e) { events = []; }
   try { passes = JSON.parse(store.get('ah_pass') || '[]'); } catch (e) { passes = []; }
@@ -659,7 +660,7 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
     $('muteHint').textContent = st.mute ? t('buzz_off') : t('buzz_on');
     $('swSiren').setAttribute('aria-checked', st.siren ? 'true' : 'false');
     $('swWebSound').setAttribute('aria-checked', webSound ? 'true' : 'false');
-    if (document.activeElement !== $('thr')) { $('thr').value = st.thr; $('thrV').textContent = Number(st.thr).toFixed(2) + ' g'; }
+    if (!thrEdit) { $('thr').value = st.thr; $('thrV').textContent = Number(st.thr).toFixed(2) + ' g'; }
 
     var enabled = (!!client && client.connected) || demo;
     ['swSound', 'swSiren', 'bTest', 'bThr'].forEach(function (id) { $(id).disabled = !enabled; });
@@ -1065,8 +1066,8 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
   $('swSiren').onclick = function () { var on = this.getAttribute('aria-checked') === 'true'; send(on ? 'siren_off' : 'siren_on'); hold('siren', on ? 0 : 1); render(); };
   $('swWebSound').onclick = function () { webSound = !webSound; store.set('ah_websound', webSound ? '1' : '0'); render(); };
   $('bTest').onclick = function () { send('test'); };
-  $('thr').oninput = function () { $('thrV').textContent = Number(this.value).toFixed(2) + ' g'; };
-  $('bThr').onclick = function () { var v = Number($('thr').value); send('thr:' + v.toFixed(2)); hold('thr', Number(v.toFixed(2))); render(); draw(); };
+  $('thr').oninput = function () { thrEdit = true; $('thrV').textContent = Number(this.value).toFixed(2) + ' g'; };
+  $('bThr').onclick = function () { var v = Number($('thr').value); send('thr:' + v.toFixed(2)); hold('thr', Number(v.toFixed(2))); thrEdit = false; render(); draw(); };
 
   /* ---- settings ---- */
   var dlg = $('dlg');
