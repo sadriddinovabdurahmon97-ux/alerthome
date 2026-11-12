@@ -997,7 +997,16 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
   /* ---- status intake ---- */
   var wasQ = false;
   function onStatus(s) {
-    for (var k in s) if (k !== 'w' && k !== 'x' && k !== 'y' && k !== 'z') st[k] = s[k];
+    for (var k in s) {
+      if (k === 'w' || k === 'x' || k === 'y' || k === 'z') continue;
+      var pd = pend[k];
+      if (pd) {
+        var same = typeof pd.v === 'number' ? Math.abs(Number(s[k]) - pd.v) < 0.001 : s[k] === pd.v;
+        if (same || Date.now() > pd.until) delete pend[k];
+        else continue;                       // stansiya buyruqni hali bajarmagan: tugma o'z holatida qoladi
+      }
+      st[k] = s[k];
+    }
     if (typeof st.t === 'string') st.t = parseFloat(st.t);
     var news = [];
     if (Array.isArray(s.w) && s.w.length) { s.w.forEach(function (mg) { news.push(mg / 1000); }); }
@@ -1050,12 +1059,14 @@ input[type=password], input[type=text] { width: 100%; font: inherit; font-size: 
   }
 
   /* ---- controls ---- */
-  $('swSound').onclick = function () { var on = this.getAttribute('aria-checked') === 'true'; send(on ? 'mute' : 'unmute'); st.mute = on ? 1 : 0; render(); };
-  $('swSiren').onclick = function () { var on = this.getAttribute('aria-checked') === 'true'; send(on ? 'siren_off' : 'siren_on'); st.siren = on ? 0 : 1; render(); };
+  var pend = {};
+  function hold(k, v) { pend[k] = { v: v, until: Date.now() + 4000 }; st[k] = v; }
+  $('swSound').onclick = function () { var on = this.getAttribute('aria-checked') === 'true'; send(on ? 'mute' : 'unmute'); hold('mute', on ? 1 : 0); render(); };
+  $('swSiren').onclick = function () { var on = this.getAttribute('aria-checked') === 'true'; send(on ? 'siren_off' : 'siren_on'); hold('siren', on ? 0 : 1); render(); };
   $('swWebSound').onclick = function () { webSound = !webSound; store.set('ah_websound', webSound ? '1' : '0'); render(); };
   $('bTest').onclick = function () { send('test'); };
   $('thr').oninput = function () { $('thrV').textContent = Number(this.value).toFixed(2) + ' g'; };
-  $('bThr').onclick = function () { var v = Number($('thr').value); send('thr:' + v.toFixed(2)); st.thr = v; render(); draw(); };
+  $('bThr').onclick = function () { var v = Number($('thr').value); send('thr:' + v.toFixed(2)); hold('thr', Number(v.toFixed(2))); render(); draw(); };
 
   /* ---- settings ---- */
   var dlg = $('dlg');
